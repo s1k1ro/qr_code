@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .vscode/
 *.png
+qr_test_notebook.py 
