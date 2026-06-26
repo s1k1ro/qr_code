@@ -3,4 +3,6 @@ __pycache__/
 *.pyc
 .vscode/
 *.png
-qr_x.py 
+qr_x.py
+QR_project_guide_v1.md
+suggested functions and decomp.md
