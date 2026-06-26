@@ -1,9 +1,7 @@
-import qrcode 
 import argparse
+import qrcode
 
-def main():
-
-    
+def pass_args():
 
     parser = argparse.ArgumentParser(description="Generate QR Code base on CLI input")
 
@@ -19,8 +17,11 @@ def main():
     parser.add_argument("-bc","--back-colour", help="control background colour, accepts colour name in string format", default="white")
     parser.add_argument("-fc","--fill-colour", help="control fill colour, accepts colour name in string format", default="black")
     parser.add_argument("-l", "--level", choices=["L","M","Q","H"], default = "L", help="Error correction level (L, M, Q, H)"  )
-    
-    args = parser.parse_args()
+
+    return parser
+
+def get_error_level(level_key):
+
 
     error_levels = {
         "L": qrcode.constants.ERROR_CORRECT_L,
@@ -29,29 +30,61 @@ def main():
         "H": qrcode.constants.ERROR_CORRECT_H,
     }
 
-    selected_level = error_levels[args.level]
+    return error_levels.get(level_key, qrcode.constants.ERROR_CORRECT_L)
 
-    if not args.data.strip():
-        print("You are missing the url/required data")
-        return
+def is_valid_data(input):
+
+    if input.strip() == "":
+        return False
     
+    return True
+
+def build_qr(version, level, size, border):
     qr = qrcode.QRCode(
-        version= args.version,
-        error_correction=selected_level,
-        box_size= args.size,
-        border= args.border,
+        version= version,
+        error_correction= level,
+        box_size= size,
+        border= border,
     )
 
+    return qr
+
+def create_image(qr_object, fill_colour, back_colour):
+    return qr_object.make_image(fill_color=fill_colour, back_color=back_colour)
+
+def save_image(image_object, output_path):
+    try:
+        image_object.save(output_path)
+        print(f"Successfully saved {output_path}")
+    except Exception as e:
+        print(f"Error: Couldnt save file. {e}")
+
+
+def main():
+
+    parser = pass_args()
+
+    args = parser.parse_args()
+
+    selected_level = get_error_level(args.level)
+
+    if not is_valid_data(args.data):
+        print("You are missing the url/required data")
+        return
+
+    qr = build_qr(
+        version=args.version, 
+        level=selected_level, 
+        size=args.size, 
+        border=args.border
+        )
+    
     qr.add_data(args.data)
     qr.make(fit=True)
 
-    img= qr.make_image(fill_color = args.fill_colour, back_color = args.back_colour)
+    img = create_image(qr, args.fill_colour, args.back_colour)
 
-    try:
-        img.save(args.output)
-        print(f"Successfully saved {args.output}")
-    except Exception as e:
-        print(f"Error: Couldnt save file. {e}")
+    save_image(img, args.output)
 
 if __name__ == "__main__":
     main()
