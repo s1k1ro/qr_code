@@ -1,5 +1,7 @@
 import argparse
 import qrcode
+import csv 
+
 
 def pass_args():
 
@@ -13,7 +15,7 @@ def pass_args():
     parser.add_argument("-o", "--output", help="output file name and type e.g myqr.png", default="qr.png")
     parser.add_argument("-v", "--version", type=int,  help="The version parameter is an int from 1 to 40 that cotnrols the size of the QR Code (smallest is 1)", default=None)
     parser.add_argument("-s", "--size", type=int, help="the size parameter controls how many pixels each 'box' of the QR code is", default = 10)
-    parser.add_argument("-b","--border", type=int,  help="the border paramater contols how many boxes thick the border should be the (default is 4 minimum from specs)", default=4)
+    parser.add_aragument("-b","--border", type=int,  help="the border paramater contols how many boxes thick the border should be the (default is 4 minimum from specs)", default=4)
     parser.add_argument("-bc","--back-colour", help="control background colour, accepts colour name in string format", default="white")
     parser.add_argument("-fc","--fill-colour", help="control fill colour, accepts colour name in string format", default="black")
     parser.add_argument("-l", "--level", choices=["L","M","Q","H"], default = "L", help="Error correction level (L, M, Q, H)")
@@ -24,6 +26,7 @@ def pass_args():
     parser.add_argument("--last-name", help="Last Name for vcard output(used with type=vcard)")
     parser.add_argument("--phone", help="phone number for vcard output(used with type=vcard)")
     parser.add_argument("--email", help="email address for vcard output(used with type=vcard)")
+    parser.add_argument("--batch", help="accepts a string (the path to the CSV file)", default=None)
 
 
     return parser
@@ -108,6 +111,73 @@ def format_vcard(first_name, last_name, phone, email):
 
     return "\n".join(lines)
 
+def normalize_row(row):
+
+    #int withd defauls
+    int_fields = ["size","border","version"]
+
+    for field in row:
+        if field not in int_fields:
+            if row[field].strip() == "":
+                row[field] = None
+        elif field == "size":
+            if row["size"].strip() == "":
+                row["size"] = 10
+            else:
+                row["size"] =int(row["size"])
+        elif field == "border":
+            if row["border"].strip() == "":
+                row["border"] = 4
+            else:
+                row["border"] =int(row["border"])
+        elif field == "version":
+            if row["version"].strip() == "":
+                row["version"] = None
+            else:
+                row["version"] = int(row["version"])
+
+    return row
+
+
+
+def proccess_one(job):
+
+    selected_level = get_error_level(job["level"])
+
+    if not is_valid_data(
+        input=job["data"], 
+        input_type=job["type"],
+        ssid=job["ssid"],
+        password=job["password"], 
+        first_name=job["first_name"],
+        last_name=job["last_name"]
+    ):
+        raise ValueError("validation failed")
+
+    if job["type"] == "text":
+        formatted_data = format_text(job["data"])
+    elif job["type"] == "url":
+        formatted_data = format_url(job["data"])
+    elif job["type"] == "wifi":
+        formatted_data = format_wifi(job["ssid"], job["password"])
+    elif job["type"] == "vcard":
+        formatted_data = format_vcard(job["first_name"], job["last_name"], job["phone"], job["email"])
+    else:
+        raise ValueError(f"unhandled type: {job['type']}")
+
+    qr = build_qr(
+        version=job["version"], 
+        level=selected_level, 
+        size=job["size"], 
+        border=job["border"]
+        )
+    qr.add_data(formatted_data)
+    qr.make(fit=True)
+
+    img = create_image(qr, job["fill_colour"], job["back_colour"])
+
+    save_image(img, job["output"])    
+
 
 def main():
 
@@ -115,46 +185,27 @@ def main():
 
     args = parser.parse_args()
 
-    selected_level = get_error_level(args.level)
+    # If batchmode checks start here:
 
-    if not is_valid_data(
-        input=args.data, 
-        input_type=args.type,
-        ssid=args.ssid,
-        password=args.password, 
-        first_name=args.first_name,
-        last_name=args.last_name
-    ):
-        return
-
-    if args.type == "text":
-        formatted_data = format_text(args.data)
-    elif args.type == "url":
-        formatted_data = format_url(args.data)
-    elif args.type == "wifi":
-        formatted_data = format_wifi(args.ssid, args.password)
-    elif args.type == "vcard":
-        formatted_data = format_vcard(args.first_name, args.last_name, args.phone, args.email)
+    if args.batch:
+        with open(args.batch, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            success = 0
+            fail = 0
+            for row in reader:
+                
+                try:
+                    row_clean = normalize_row(row)
+                    proccess_one(row_clean)
+                    success += 1
+                except Exception as e:
+                    print(f"Row failed: {e}")
+                    fail +=1
+            print(f"{success} succeeded, {fail} failed")
     else:
-        raise ValueError(f"unhandled type: {args.type}")
+        arg_list = vars(args)
+        proccess_one(arg_list)
 
-       
-
-    qr = build_qr(
-        version=args.version, 
-        level=selected_level, 
-        size=args.size, 
-        border=args.border
-        )
-    
- 
-
-    qr.add_data(formatted_data)
-    qr.make(fit=True)
-
-    img = create_image(qr, args.fill_colour, args.back_colour)
-
-    save_image(img, args.output)
 
 if __name__ == "__main__":
-    main()
+     main()
