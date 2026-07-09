@@ -1,0 +1,5 @@
+type,data,output,ssid,password,first_name,last_name,phone,email,size,border,fill_colour,back_colour,level,version
+text,Hello world,hello.png,,,,,,,10,4,black,white,L,
+url,https://boot.dev,bootdev.png,,,,,,,10,4,black,white,L,
+wifi,,network_home.png,MyHomeWifi,supersecretpassword,,,,,10,4,black,white,L,
+BADPATH,,contact_john.png,,,John,Doe,61400000000,john@email.com,10,4,black,white,L,
