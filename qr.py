@@ -70,7 +70,11 @@ def build_qr(version, level, size, border):
     return qr
 
 def create_image(qr_object, fill_colour, back_colour):
-    return qr_object.make_image(fill_color=fill_colour, back_color=back_colour)
+    try:
+        qr = qr_object.make_image(fill_color=fill_colour, back_color=back_colour)
+        return qr
+    except Exception as e:
+        print(f"Error: Couldnt create qr. {e}")
 
 def save_image(image_object, output_path):
     try:
@@ -89,23 +93,59 @@ def format_url(url: str):
     
     return url
 
+
+
+def escape_wifi(value):
+    escaped_value = value
+    escaped_value = escaped_value.replace("\\", "\\\\")
+    escaped_value = escaped_value.replace(";", "\\;")
+    escaped_value = escaped_value.replace(",", "\\,")
+    escaped_value = escaped_value.replace(":", "\\:")
+    escaped_value = escaped_value.replace('"', '\\"')
+    return escaped_value
+
 def format_wifi(ssid, password):
-    wifi_str = f"WIFI:S:{ssid};T:WPA;P:{password};;"
-    return wifi_str
+    safe_ssid = escape_wifi(ssid)
+    safe_password = escape_wifi(password)
+    wifi_str = f"WIFI:S:{safe_ssid};T:WPA;P:{safe_password};;"
+    return wifi_str   
+
+def escape_vcard(value):
+    escaped_value = value
+    escaped_value = escaped_value.replace("\\", "\\\\")
+    escaped_value = escaped_value.replace(",", "\\,")
+    escaped_value = escaped_value.replace(";", "\\;")
+    escaped_value = escaped_value.replace("\n","\\n")
+    return escaped_value
 
 def format_vcard(first_name, last_name, phone, email):
+    if first_name:
+        safe_first = escape_vcard(first_name) 
+    else:
+        safe_first = ""
+    
+    if last_name:
+        safe_last = escape_vcard(last_name) 
+    else:
+        safe_last = ""
 
-    safe_first = first_name or ""
-    safe_last = last_name or ""
+    if phone:
+        safe_phone = escape_vcard(phone)
+    else:
+        safe_phone = ""
+    if email:
+        safe_email = escape_vcard(email)
+    else:
+        safe_email = ""
 
     lines = ["BEGIN:VCARD", "VERSION:3.0"]
     lines.append(f"N:{safe_last};{safe_first}")
     lines.append(f"FN:{(safe_first + ' ' + safe_last).strip()}")
 
-    if phone is not None:
-        lines.append(f"TEL:{phone}")
-    if email is not None:
-        lines.append(f"EMAIL:{email}")
+    if safe_phone:
+        lines.append(f"TEL:{safe_phone}")
+    if safe_email:
+        lines.append(f"EMAIL:{safe_email}")
     
     lines.append("END:VCARD")
 
@@ -140,7 +180,7 @@ def normalize_row(row):
 
 
 
-def proccess_one(job):
+def process_one(job):
 
     selected_level = get_error_level(job["level"])
 
@@ -175,8 +215,10 @@ def proccess_one(job):
     qr.make(fit=True)
 
     img = create_image(qr, job["fill_colour"], job["back_colour"])
-
-    save_image(img, job["output"])    
+    if img:
+        save_image(img, job["output"])
+    else:
+        raise ValueError(f"Error: Couldnt create QR") 
 
 
 def main():
@@ -196,7 +238,7 @@ def main():
                 
                 try:
                     row_clean = normalize_row(row)
-                    proccess_one(row_clean)
+                    process_one(row_clean)
                     success += 1
                 except Exception as e:
                     print(f"Row failed: {e}")
@@ -204,7 +246,7 @@ def main():
             print(f"{success} succeeded, {fail} failed")
     else:
         arg_list = vars(args)
-        proccess_one(arg_list)
+        process_one(arg_list)
 
 
 if __name__ == "__main__":
